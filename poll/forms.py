@@ -1,11 +1,23 @@
 from django import forms
 
 from django.contrib.auth.models import Group
-from .models import Poll, Category, Rule ,Translation
+from .models import Poll, Category, Rule , Translation
 from rapidsms.models import Contact
 from django.forms.widgets import RadioSelect
 
 import re
+
+#def make_newpoll_form():
+#    fields = {}
+#    for field in xform.fields.all().order_by('order'):
+#        if field.xform_type() == 'binary':
+#            fields[field.command] = forms.FileField(required=False,
+#                                                    help_text=field.description,
+#                                                    label=field.name)
+#        else:
+#            fields[field.command] = forms.CharField(required=False,
+#                                                    help_text=field.description,
+#                                                    label=field.name)
 
 class NewPollForm(forms.Form): # pragma: no cover
 
@@ -16,16 +28,14 @@ class NewPollForm(forms.Form): # pragma: no cover
                choices=(
                     (TYPE_YES_NO, 'Yes/No Question'),
                 ))
-    response_type=forms.ChoiceField(choices=Poll.RESPONSE_TYPE_CHOICES,widget=RadioSelect,initial=Poll.RESPONSE_TYPE_ALL)
+    response_type = forms.ChoiceField(choices=Poll.RESPONSE_TYPE_CHOICES, widget=RadioSelect, initial=Poll.RESPONSE_TYPE_ALL)
 
     def updateTypes(self):
         self.fields['type'].widget.choices += [(choice['type'], choice['label']) for choice in Poll.TYPE_CHOICES.values()]
 
     name = forms.CharField(max_length=32, required=True)
     question = forms.CharField(max_length=160, required=True, widget=forms.Textarea())
-    question_luo = forms.CharField(max_length=160, required=False, widget=forms.Textarea())
     default_response = forms.CharField(max_length=160, required=False, widget=forms.Textarea())
-    default_response_luo = forms.CharField(max_length=160, required=False, widget=forms.Textarea())
     start_immediately = forms.BooleanField(required=False)
     contacts = forms.ModelMultipleChoiceField(queryset=Contact.objects.all(), required=False)
 

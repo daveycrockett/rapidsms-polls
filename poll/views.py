@@ -50,7 +50,7 @@ def responses_as_csv(req, pk):
 def polls(req):
     polls = Poll.objects.annotate(Count('responses'
                                   )).order_by('start_date')
-    breadcrumbs = (('Polls', ''), )
+    breadcrumbs = (('Polls', ''),)
     return render_to_response('polls/poll_index.html', {'polls': polls,
                               'breadcrumbs': breadcrumbs},
                               context_instance=RequestContext(req))
@@ -84,7 +84,7 @@ def demo(req, poll_id):
     return HttpResponse(status=200)
 
 def quote(string):
-    return string.replace('"','\"').replace("'","\'")
+    return string.replace('"', '\"').replace("'", "\'")
 
 @permission_required('poll.can_poll')
 def new_poll(req):
@@ -93,7 +93,7 @@ def new_poll(req):
         form.updateTypes()
         if form.is_valid():
 
-            # create our XForm
+            # create our Poll
 
             question = form.cleaned_data['question']
             default_response = form.cleaned_data['default_response']
@@ -113,39 +113,12 @@ def new_poll(req):
 #            else:
 #                contacts = []
             response_type = form.cleaned_data['response_type']
-            if not form.cleaned_data['default_response_luo'] == '' \
-                and not form.cleaned_data['default_response'] == '':
-                (translation, created) = \
-                    Translation.objects.get_or_create(language='ach',
-                        field=form.cleaned_data['default_response'],
-                        value=form.cleaned_data['default_response_luo'])
-
-            if not form.cleaned_data['question_luo'] == '':
-                (translation, created) = \
-                    Translation.objects.get_or_create(language='ach',
-                        field=form.cleaned_data['question'],
-                        value=form.cleaned_data['question_luo'])
 
             poll_type = (Poll.TYPE_TEXT if p_type
                          == NewPollForm.TYPE_YES_NO else p_type)
 
             start_immediately = form.cleaned_data['start_immediately']
 
-#            # run poll creation as a daemon process to avoid nginx timing out
-#
-#            args = "['nohup', 'python', 'manage.py' ,'send_poll', '-n', '%s', '-t', '%s', '-q' ,'%s','-r', '%s','-c', '\"%s\"', '-u', '%s','-s', '%s','-e', '%s','-g', '\"%s\"','&']"% (
-#                quote(name),
-#                poll_type,
-#                quote(question),
-#                quote(str(default_response)),
-#                str(contacts),
-#                req.user.pk,
-#                start_immediately,
-#                response_type,
-#                str(groups)
-#                )
-#            subprocess.Popen(eval(args))
-            
             poll = Poll.create_with_bulk(\
                                  name,
                                  poll_type,
@@ -275,7 +248,7 @@ def view_report(
                 == Attribute.TYPE_FLOAT:
                 results = results + list(report)
 
-    breadcrumbs = (('Polls', reverse('polls')), )
+    breadcrumbs = (('Polls', reverse('polls')),)
     context = {
         'poll': poll,
         'breadcrumbs': breadcrumbs,
@@ -287,7 +260,7 @@ def view_report(
     if poll.type != Poll.TYPE_TEXT and poll.type != Poll.TYPE_NUMERIC:
         return render_to_response('polls/poll_index.html', {'polls'
                                   : Poll.objects.order_by('start_date'
-                                  ), 'breadcrumbs': (('Polls', ''), )},
+                                  ), 'breadcrumbs': (('Polls', ''),)},
                                   context_instance=RequestContext(req))
     else:
         return render_to_response(template, context,

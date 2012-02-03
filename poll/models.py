@@ -277,15 +277,15 @@ class Poll(models.Model):
         """
         contacts = self.contacts
         localized_messages = {}
+        languages = getattr(settings, 'LANGUAGES', ['en'])
+        default_language = getattr(settings, 'DEFAULT_LANGUAGE', 'en')
         for language in dict(settings.LANGUAGES).keys():
-            if language == "en":
-                """default to English for contacts with no language preference"""
-                localized_contacts = contacts.filter(language__in=["en", ''])
+            if language == default_language:
+                localized_contacts = contacts.filter(language__in=[language, ''])
             else:
-
                 localized_contacts = contacts.filter(language=language)
             if localized_contacts.exists():
-                messages = Message.mass_text(gettext_db(field=self.question, language=language), Connection.objects.filter(contact__in=localized_contacts).distinct(), status='P', batch_status='Q')
+                messages = Message.mass_text(gettext_db(field=self.question, language=language), Connection.objects.filter(contact__in=localized_contacts).distinct(), status='Q', batch_status='Q')
                 localized_messages[language] = [messages, localized_contacts]
 
         # This is the fastest (pretty much only) was to get messages M2M into the
