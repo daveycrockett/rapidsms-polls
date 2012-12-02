@@ -20,7 +20,7 @@ from eav.models import Value, Attribute
 
 from generic.sorters import SimpleSorter
 
-from rapidsms.contrib.locations.models import Location
+from rapidsms.contrib.locations.models import Location, LocationType
 from rapidsms.contrib.locations.nested import models as nested_models
 from rapidsms_httprouter.models import Message, MessageBatch
 
@@ -39,9 +39,9 @@ STARTSWITH_PATTERN_TEMPLATE = '^\s*(%s)(\s|[^a-zA-Z]|$)'
 
 CONTAINS_PATTERN_TEMPLATE = '^.*\s*(%s)(\s|[^a-zA-Z]|$)'
 
-# This can be configurable from settings, but here's a default list of 
+# This can be configurable from settings, but here's a default list of
 # accepted yes keywords
-#YES_WORDS = ['yes', 'yeah', 'yep', 'yay', 'y']
+# YES_WORDS = ['yes', 'yeah', 'yep', 'yay', 'y']
 
 YES_WORDS = {
     'en':['yes', 'yeah', 'yep', 'yay', 'y'],
@@ -102,9 +102,9 @@ class Poll(models.Model):
     TYPE_LOCATION = 'l'
     TYPE_REGISTRATION = 'r'
 
-    RESPONSE_TYPE_ALL = 'a'# all all responses
-    RESPONSE_TYPE_ONE = 'o' # allow only one
-    RESPONSE_TYPE_NO_DUPS = 'd'# ignore duplicates
+    RESPONSE_TYPE_ALL = 'a'  # all all responses
+    RESPONSE_TYPE_ONE = 'o'  # allow only one
+    RESPONSE_TYPE_NO_DUPS = 'd'  # ignore duplicates
 
     RESPONSE_TYPE_CHOICES = (
                             (RESPONSE_TYPE_ALL, 'Allow all'),
@@ -217,8 +217,8 @@ class Poll(models.Model):
 
     @classmethod
     @transaction.commit_on_success
-    def create_with_bulk(cls, name, type, question, default_response, contacts, user):
-        poll = Poll.objects.create(name=name, type=type, question=question, default_response=default_response, user=user)
+    def create_with_bulk(cls, name, poll_type, question, default_response, contacts, user):
+        poll = Poll.objects.create(name=name, type=poll_type, question=question, default_response=default_response, user=user)
 
         # This is the fastest (pretty much only) was to get contacts and messages M2M into the
         # DB fast enough at scale
@@ -236,13 +236,13 @@ class Poll(models.Model):
         """
         This creates a generic yes/no poll categories for a particular poll
         """
-        #langs = self.contacts.values_list('language',flat=True).distinct()
+        # langs = self.contacts.values_list('language',flat=True).distinct()
         langs = dict(settings.LANGUAGES).keys()
         self.categories.create(name='yes')
         self.categories.create(name='no')
         self.categories.create(name='unknown', default=True, error_category=True)
 
-          # add one rule to yes category per language
+        # add one rule to yes category per language
         for l in langs:
             if l in NO_WORDS.keys() and l in YES_WORDS.keys():
                 no_rule_string = '|'.join(NO_WORDS[l])
@@ -258,7 +258,7 @@ class Poll(models.Model):
                     rule_type=Rule.TYPE_REGEX,
                     rule_string=(STARTSWITH_PATTERN_TEMPLATE % no_rule_string))
             else:
-                #skip iteration when language is not present
+                # skip iteration when language is not present
                 pass
 
     def is_yesno_poll(self):
@@ -277,7 +277,6 @@ class Poll(models.Model):
         """
         contacts = self.contacts
         localized_messages = {}
-        languages = getattr(settings, 'LANGUAGES', ['en'])
         default_language = getattr(settings, 'DEFAULT_LANGUAGE', 'en')
         for language in dict(settings.LANGUAGES).keys():
             if language == default_language:
@@ -339,11 +338,18 @@ class Poll(models.Model):
                 spn = regex.search(message.text).span()
                 location_str = message.text[spn[0]:spn[1]]
                 area = None
-                area_names = Location.objects.all().values_list('name', flat=True)
+
+                type_names = LocationType.objects.values_list('name', flat=True)
+                if 'LOCATION_POLL_VALID_TYPES' in dir(settings) and settings.LOCATION_POLL_VALID_TYPES:
+                    type_names = settings.LOCATION_POLL_VALID_TYPES
+
+                locations = Location.objects.filter(type__name__in=type_names)
+
+                area_names = locations.values_list('name', flat=True)
                 area_names_lower = [ai.lower() for ai in area_names]
                 area_names_matches = difflib.get_close_matches(location_str.lower(), area_names_lower)
                 if area_names_matches:
-                    area = Location.objects.filter(name__iexact=area_names_matches[0])[0]
+                    area = Location.objects.filter(name__iexact=area_names_matches[0], type__name__in=type_names)[0]
                     resp.eav.poll_location_value = area
                     resp.save()
                 else:
@@ -355,13 +361,13 @@ class Poll(models.Model):
         elif (self.type == Poll.TYPE_NUMERIC):
             try:
                 regex = re.compile(r"(-?\d+(\.\d+)?)")
-                #split the text on number regex. if the msg is of form
-                #'19'or '19 years' or '19years' or 'age19'or 'ugx34.56shs' it returns a list of length 4
+                # split the text on number regex. if the msg is of form
+                # '19'or '19 years' or '19years' or 'age19'or 'ugx34.56shs' it returns a list of length 4
                 msg_parts = regex.split(message.text)
                 if len(msg_parts) == 4 :
                     resp.eav.poll_number_value = float(msg_parts[1])
                 else:
-                     resp.has_errors = True
+                    resp.has_errors = True
             except IndexError:
                 resp.has_errors = True
 
@@ -654,13 +660,13 @@ class Translation(models.Model):
 
 
 def gettext_db(field, language):
-    #if name exists in po file get it else look
+    # if name exists in po file get it else look
     if Translation.objects.filter(field=field, language=language).exists():
-       return Translation.objects.filter(field=field, language=language)[0].value
+        return Translation.objects.filter(field=field, language=language)[0].value
     else:
-       activate(language)
-       lang_str = ugettext(field)
-       deactivate()
-       return lang_str
+        activate(language)
+        lang_str = ugettext(field)
+        deactivate()
+        return lang_str
 
 
